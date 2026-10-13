@@ -21,10 +21,13 @@ internal class SupabaseNotasRepository(
             method = "GET",
             path = "/rest/v1/notas?select=id,titulo,descripcion,creada_en&order=creada_en.desc"
         )
+
         try {
             val jsonArray = JSONArray(response)
+
             List(jsonArray.length()) { index ->
                 val item = jsonArray.getJSONObject(index)
+
                 Nota(
                     id = item.getString("id"),
                     titulo = item.getString("titulo"),
@@ -33,7 +36,10 @@ internal class SupabaseNotasRepository(
                 )
             }
         } catch (exception: JSONException) {
-            throw IOException("Supabase devolvió una respuesta de notas no válida.", exception)
+            throw IOException(
+                "Supabase devolvió una respuesta de notas no válida.",
+                exception
+            )
         }
     }
 
@@ -43,6 +49,7 @@ internal class SupabaseNotasRepository(
                 .put("titulo", titulo.trim())
                 .put("descripcion", descripcion.trim())
                 .toString()
+
             request(
                 method = "POST",
                 path = "/rest/v1/notas",
@@ -51,38 +58,61 @@ internal class SupabaseNotasRepository(
         }
     }
 
-    private fun request(method: String, path: String, body: String? = null): String {
+    private fun request(
+        method: String,
+        path: String,
+        body: String? = null
+    ): String {
         val baseUrl = projectUrl.trim().trimEnd('/')
-        val connection = (URL("$baseUrl$path").openConnection() as HttpURLConnection).apply {
-            requestMethod = method
-            connectTimeout = 15_000
-            readTimeout = 15_000
-            setRequestProperty("apikey", anonKey)
-            setRequestProperty("Authorization", "Bearer $anonKey")
-            setRequestProperty("Accept", "application/json")
-            if (body != null) {
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                setRequestProperty("Prefer", "return=minimal")
+
+        val connection =
+            (URL("$baseUrl$path").openConnection() as HttpURLConnection).apply {
+                requestMethod = method
+                connectTimeout = 15_000
+                readTimeout = 15_000
+
+                setRequestProperty("apikey", anonKey)
+                setRequestProperty("Authorization", "Bearer $anonKey")
+                setRequestProperty("Accept", "application/json")
+
+                if (body != null) {
+                    doOutput = true
+                    setRequestProperty(
+                        "Content-Type",
+                        "application/json; charset=utf-8"
+                    )
+                    setRequestProperty("Prefer", "return=minimal")
+                }
             }
-        }
 
         try {
             if (body != null) {
-                connection.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(body) }
+                connection.outputStream
+                    .bufferedWriter(Charsets.UTF_8)
+                    .use { it.write(body) }
             }
 
             val statusCode = connection.responseCode
+
             val responseStream = if (statusCode in 200..299) {
                 connection.inputStream
             } else {
                 connection.errorStream
             }
-            val responseBody = responseStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+
+            val responseBody = responseStream
+                ?.bufferedReader(Charsets.UTF_8)
+                ?.use { it.readText() }
+                .orEmpty()
+
             if (statusCode !in 200..299) {
-                throw IOException("Error de Supabase ($statusCode): ${responseBody.ifBlank { "sin detalles" }}")
+                throw IOException(
+                    "Error de Supabase ($statusCode): " +
+                            responseBody.ifBlank { "sin detalles" }
+                )
             }
-            responseBody
+
+            return responseBody
         } finally {
             connection.disconnect()
         }
