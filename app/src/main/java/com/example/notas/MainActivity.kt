@@ -3,226 +3,45 @@ package com.example.notas
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.example.notas.ui.theme.NotasTheme
-import kotlinx.coroutines.launch
-import java.io.IOException
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+
+        // Construye la interfaz con Jetpack Compose.
         setContent {
-            NotasTheme {
-                NotasScreen(
-                    repository = remember {
-                        SupabaseNotasRepository(
-                            projectUrl = BuildConfig.SUPABASE_URL,
-                            anonKey = BuildConfig.SUPABASE_ANON_KEY
-                        )
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun NotasScreen(repository: SupabaseNotasRepository) {
-    var titulo by remember { mutableStateOf("") }
-    var descripcion by remember { mutableStateOf("") }
-    var notas by remember { mutableStateOf<List<Nota>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(false) }
-    var isSaving by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
-    var isError by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    suspend fun cargarNotas() {
-        if (!repository.isConfigured) {
-            message = "Configura supabase.url y supabase.anonKey en local.properties."
-            isError = true
-            return
-        }
-        isLoading = true
-        try {
-            notas = repository.getNotas()
-            message = null
-            isError = false
-        } catch (exception: IOException) {
-            message = exception.message ?: "No se pudieron consultar las notas."
-            isError = true
-        } finally {
-            isLoading = false
-        }
-    }
-
-    LaunchedEffect(repository) {
-        cargarNotas()
-    }
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background
-    ) { contentPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding)
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Notas en la nube",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Guarda tus ideas y consúltalas desde cualquier lugar.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            MaterialTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
                 ) {
-                    Text("Nueva nota", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    OutlinedTextField(
-                        value = titulo,
-                        onValueChange = { titulo = it.take(80) },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Título") },
-                        supportingText = { Text("${titulo.length}/80 (mínimo 3)") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = descripcion,
-                        onValueChange = { descripcion = it.take(300) },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Descripción") },
-                        supportingText = { Text("${descripcion.length}/300") },
-                        minLines = 3
-                    )
-
-                    val validationError = NotaValidator.validate(titulo, descripcion)
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                isSaving = true
-                                try {
-                                    repository.crearNota(titulo, descripcion)
-                                    titulo = ""
-                                    descripcion = ""
-                                    message = "Nota guardada correctamente."
-                                    isError = false
-                                    cargarNotas()
-                                } catch (exception: IOException) {
-                                    message = exception.message ?: "No se pudo guardar la nota."
-                                    isError = true
-                                } finally {
-                                    isSaving = false
-                                }
-                            }
-                        },
-                        enabled = validationError == null && !isSaving && repository.isConfigured,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.height(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text("Enviando…")
-                        } else {
-                            Text("Guardar nota")
-                        }
-                    }
-                    if (validationError != null) {
-                        Text(
-                            text = validationError,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Notas guardadas", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                TextButton(
-                    onClick = { scope.launch { cargarNotas() } },
-                    enabled = !isLoading && repository.isConfigured
-                ) {
-                    Text("Actualizar")
-                }
-            }
-
-            if (message != null) {
-                Text(
-                    text = message.orEmpty(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                )
-            }
-
-            when {
-                isLoading && notas.isEmpty() -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-                notas.isEmpty() && !isError -> Text(
-                    text = "Todavía no hay notas. ¡Crea la primera!",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    notas.forEach { nota -> NotaCard(nota) }
+                    AccesoSeguro()
                 }
             }
         }
@@ -230,35 +49,167 @@ private fun NotasScreen(repository: SupabaseNotasRepository) {
 }
 
 @Composable
-private fun NotaCard(nota: Nota) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+fun AccesoSeguro() {
+
+    // Estados de los campos y mensajes de la interfaz.
+    var usuario by remember { mutableStateOf("") }
+    var contrasena by remember { mutableStateOf("") }
+    var mostrarContrasena by remember { mutableStateOf(false) }
+    var mensaje by remember { mutableStateOf("") }
+    var accesoCorrecto by remember { mutableStateOf(false) }
+
+    // Longitudes máximas permitidas.
+    val maxUsuario = 30
+    val maxContrasena = 64
+
+    // Usuarios ficticios para probar el inicio de sesión.
+    // No son credenciales adecuadas para una aplicación real.
+    val usuariosValidos = mapOf(
+        "alumno" to "Seguro123",
+        "profesor" to "Clase2026",
+        "invitado" to "Invitado123"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(nota.titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            if (nota.descripcion.isNotBlank()) {
-                Text(nota.descripcion, style = MaterialTheme.typography.bodyMedium)
-            }
-            HorizontalDivider()
-            Text(
-                text = "Creada: ${nota.creadaEn.substringBefore('T').ifBlank { "fecha no disponible" }}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
 
-@Preview(showBackground = true)
-@Composable
-private fun NotaCardPreview() {
-    NotasTheme {
-        Surface(modifier = Modifier.padding(16.dp)) {
-            NotaCard(Nota("preview", "Mi primera nota", "Esta nota es una vista previa.", "2026-10-12T12:00:00Z"))
+        Text(
+            text = "AccesoSeguro",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Inicia sesión para continuar",
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Campo de usuario. Rechaza caracteres que excedan el límite.
+        OutlinedTextField(
+            value = usuario,
+            onValueChange = { nuevoUsuario ->
+                if (nuevoUsuario.length <= maxUsuario) {
+                    usuario = nuevoUsuario
+                    mensaje = ""
+                    accesoCorrecto = false
+                } else {
+                    mensaje =
+                        "El usuario no puede superar $maxUsuario caracteres."
+                    accesoCorrecto = false
+                }
+            },
+            label = { Text("Usuario") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Text
+            ),
+            supportingText = {
+                Text("${usuario.length}/$maxUsuario caracteres")
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Campo de contraseña oculta por defecto.
+        OutlinedTextField(
+            value = contrasena,
+            onValueChange = { nuevaContrasena ->
+                if (nuevaContrasena.length <= maxContrasena) {
+                    contrasena = nuevaContrasena
+                    mensaje = ""
+                    accesoCorrecto = false
+                } else {
+                    mensaje =
+                        "La contraseña no puede superar $maxContrasena caracteres."
+                    accesoCorrecto = false
+                }
+            },
+            label = { Text("Contraseña") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password
+            ),
+            visualTransformation = if (mostrarContrasena) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
+            trailingIcon = {
+                TextButton(
+                    onClick = {
+                        mostrarContrasena = !mostrarContrasena
+                    }
+                ) {
+                    Text(
+                        if (mostrarContrasena) "Ocultar" else "Mostrar"
+                    )
+                }
+            },
+            supportingText = {
+                Text("${contrasena.length}/$maxContrasena caracteres")
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Valida las entradas y simula el inicio de sesión.
+        Button(
+            onClick = {
+                val usuarioLimpio = usuario.trim()
+
+                mensaje = when {
+                    // Rechaza campos vacíos y usuarios con solo espacios.
+                    usuarioLimpio.isEmpty() || contrasena.isEmpty() ->
+                        "Completa ambos campos."
+
+                    // La contraseña debe tener al menos ocho caracteres.
+                    contrasena.length < 8 ->
+                        "La contraseña debe tener al menos 8 caracteres."
+
+                    // Comprueba si coinciden el usuario y la contraseña.
+                    usuariosValidos[usuarioLimpio] == contrasena ->
+                        "¡Acceso simulado correcto!"
+
+                    // No especifica si falló el usuario o la contraseña.
+                    else ->
+                        "No se pudo iniciar sesión. Verifica los datos."
+                }
+
+                accesoCorrecto =
+                    mensaje == "¡Acceso simulado correcto!"
+
+                // Por seguridad, no se registran credenciales en Logcat.
+                // No usar Log.d, Log.i, Log.e ni println con estos datos.
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Iniciar sesión")
+        }
+
+        // Muestra el resultado de la validación.
+        if (mensaje.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = mensaje,
+                color = if (accesoCorrecto) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
